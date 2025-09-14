@@ -1,5 +1,5 @@
-import Post from '../models/Post.js';
-import User from '../models/User.js';
+import Post from './models/Post.js';
+import User from './models/User.js';
 import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
