@@ -9,6 +9,7 @@
  
   
   "imports": {
+     "#config/*": "./src/config/*",
     "#models/*": "./src/models/*",
     "#utils/*": "./src/utils/*",
     "#controllers/*": "./src/controllers/*",
