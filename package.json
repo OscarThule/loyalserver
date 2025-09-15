@@ -4,12 +4,21 @@
   "type": "module",
   "description": "",
   "main": "index.js",
+
+
+  "_moduleAliases": {
+  "@config": "src/config",
+  "@controllers": "src/controllers",
+  "@models": "src/models",
+  "@routes": "src/routes",
+  "@utils": "src/utils"
+},
+
   "scripts": {
     "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
     "build": "tsc"
-     
   },
   "keywords": [],
   "author": "",
@@ -24,6 +33,7 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
     "mongoose": "^8.15.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
