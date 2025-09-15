@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import User from '@models/User.js';
-import { validateEmail } from '@utils/validators.js';
+import User from '#models/User.js';
+import { validateEmail } from '#utils/validators.js';
 
 
 const generateToken = (userId) => {
