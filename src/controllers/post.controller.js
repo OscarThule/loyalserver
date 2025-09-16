@@ -1,41 +1,20 @@
 import User from '#models/User.js';
-import Post from '#models/post.js';   // ✅ Missing Post model import
+import Post from '#models/post.js';
 import mongoose from 'mongoose';
-import path from 'path';
-import fs from 'fs';
-import os from "os";
-
-// Helper to get your LAN IP
-function getLocalIp() {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return "localhost";
-}
+import { v2 as cloudinary } from 'cloudinary';
 
 // Format response consistently
 const formatPostResponse = (post, req) => {
-  const serverHost =
-    process.env.SERVER_HOST || `${getLocalIp()}:${process.env.PORT || 5002}`;
-
   return {
     id: post._id,
     content: post.content,
-    media: post.media
-      ? `${req.protocol}://${serverHost}/uploads/${path.basename(post.media)}`
-      : null,
-
+    media: post.media, // Use Cloudinary URL directly
+    publicId: post.publicId, // Include Cloudinary public_id
     author: {
       id: post.author.id,
       name: post.author.name,
       username: post.author.username,
     },
-
     likes: post.likes,
     comments: post.comments.map((comment) => ({
       id: comment._id,
@@ -46,10 +25,8 @@ const formatPostResponse = (post, req) => {
       },
       createdAt: comment.createdAt || new Date(),
     })),
-
     shares: post.shares,
     createdAt: post.createdAt || new Date(),
-
     ...(post.repost && {
       repost: {
         repostId: post.repost._id || post.repost.originalPostId,
@@ -57,11 +34,7 @@ const formatPostResponse = (post, req) => {
         originalAuthor: post.repost.originalAuthor,
         originalAuthorId: post.repost.originalAuthorId,
         originalContent: post.repost.originalContent,
-        originalMedia: post.repost.originalMedia
-          ? `${req.protocol}://${serverHost}/uploads/${path.basename(
-              post.repost.originalMedia
-            )}`
-          : null,
+        originalMedia: post.repost.originalMedia, // Use Cloudinary URL
       },
     }),
   };
@@ -83,7 +56,6 @@ export const createPost = async (req, res) => {
 
     const author = await User.findById(req.userId);
     if (!author) {
-      if (mediaFile) fs.unlinkSync(mediaFile.path);
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -104,7 +76,8 @@ export const createPost = async (req, res) => {
     };
 
     if (mediaFile) {
-      postData.media = mediaFile.path;
+      postData.media = req.file.path; // Cloudinary URL
+      postData.publicId = req.file.filename; // Cloudinary public_id
     }
 
     const post = new Post(postData);
@@ -115,7 +88,6 @@ export const createPost = async (req, res) => {
       post: formatPostResponse(post, req),
     });
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
     console.error('Create post error:', error);
     return res.status(500).json({
       success: false,
@@ -127,8 +99,7 @@ export const createPost = async (req, res) => {
 
 export const getUserPosts = async (req, res) => {
   try {
-    const posts = await Post.find({ 'author.id': req.userId })
-      .sort({ createdAt: -1 });
+    const posts = await Post.find({ 'author.id': req.userId }).sort({ createdAt: -1 });
 
     return res.json({
       success: true,
@@ -165,14 +136,12 @@ export const likePost = async (req, res) => {
       });
     }
 
-    const likeIndex = post.likes.findIndex(
-      (id) => id.toString() === userId.toString()
-    );
+    const likeIndex = post.likes.findIndex((id) => id.toString() === userId.toString());
 
     if (likeIndex >= 0) {
-      post.likes.splice(likeIndex, 1); // unlike
+      post.likes.splice(likeIndex, 1); // Unlike
     } else {
-      post.likes.push(userId); // like
+      post.likes.push(userId); // Like
     }
 
     await post.save();
@@ -186,7 +155,7 @@ export const likePost = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to like post',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -235,7 +204,7 @@ export const addComment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to add comment',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -272,7 +241,7 @@ export const sharePost = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to share post',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -294,11 +263,11 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    if (post.media) {
+    if (post.publicId) {
       try {
-        fs.unlinkSync(post.media);
+        await cloudinary.uploader.destroy(post.publicId); // Delete from Cloudinary
       } catch (err) {
-        console.error('Error deleting media file:', err);
+        console.error('Error deleting Cloudinary asset:', err);
       }
     }
 
@@ -313,7 +282,7 @@ export const deletePost = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete post',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

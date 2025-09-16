@@ -27,12 +27,27 @@ const CommentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Repost Schema
+const RepostSchema = new mongoose.Schema({
+  originalPostId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post',
+  },
+  originalAuthor: String,
+  originalAuthorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  originalContent: String,
+  originalMedia: String,
+});
+
 // Post Schema
 const PostSchema = new mongoose.Schema(
   {
     content: {
       type: String,
-      required: true,
+      required: false, // Allow posts with only media
       trim: true,
     },
     author: {
@@ -49,6 +64,9 @@ const PostSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
+      email: {
+        type: String, // Add email to match controller
+      },
     },
     likes: [
       {
@@ -64,14 +82,22 @@ const PostSchema = new mongoose.Schema(
       },
     ],
     media: {
-      type: String, // store file path or URL
+      type: String, // Cloudinary URL
+      default: null,
+    },
+    publicId: {
+      type: String, // Cloudinary public_id for deletion
+      default: null,
+    },
+    repost: {
+      type: RepostSchema,
       default: null,
     },
   },
   {
     timestamps: true,
     toJSON: {
-      virtuals: true, // include virtuals when converting to JSON
+      virtuals: true,
       transform: function (doc, ret) {
         ret.id = ret._id;
         delete ret._id;
@@ -82,17 +108,15 @@ const PostSchema = new mongoose.Schema(
   }
 );
 
-// Add a virtual property for totalLikes
+// Virtual properties
 PostSchema.virtual('totalLikes').get(function () {
   return this.likes.length;
 });
 
-// Add a virtual property for totalComments
 PostSchema.virtual('totalComments').get(function () {
   return this.comments.length;
 });
 
-// Add a virtual property for totalShares
 PostSchema.virtual('totalShares').get(function () {
   return this.shares.length;
 });
