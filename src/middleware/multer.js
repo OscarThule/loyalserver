@@ -1,39 +1,31 @@
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import dotenv from 'dotenv';
 
-// Configure Cloudinary with env vars
+dotenv.config();
+
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Set up Cloudinary storage
+// Multer storage using Cloudinary
 const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    let folder = 'uploads'; // Default folder in Cloudinary
-    let resourceType = 'image';
-
-    if (file.mimetype.startsWith('video/')) {
-      folder = 'videos';
-      resourceType = 'video';
-    }
-
-    return {
-      folder,
-      resource_type: resourceType,
-      allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'mp4', 'webm', 'mov'],
-      public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
-    };
-  },
+  cloudinary: cloudinary,
+  params: async (req, file) => ({
+    folder: 'posts',          // folder in your Cloudinary account
+    resource_type: 'auto',    // 'auto' allows any kind of media
+    public_id: `${Date.now()}-${file.originalname}`
+  })
 });
 
-// Multer instance (Cloudinary storage + size limits)
+// Multer instance
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for videos
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max size
 });
 
 export default upload;
