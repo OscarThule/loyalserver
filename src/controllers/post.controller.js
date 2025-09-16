@@ -1,11 +1,9 @@
-
 import User from '#models/User.js';
+import Post from '#models/post.js';   // ✅ Missing Post model import
 import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
 import os from "os";
-
-
 
 // Helper to get your LAN IP
 function getLocalIp() {
@@ -20,6 +18,7 @@ function getLocalIp() {
   return "localhost";
 }
 
+// Format response consistently
 const formatPostResponse = (post, req) => {
   const serverHost =
     process.env.SERVER_HOST || `${getLocalIp()}:${process.env.PORT || 5002}`;
@@ -68,7 +67,7 @@ const formatPostResponse = (post, req) => {
   };
 };
 
-export default formatPostResponse;
+/* ---------------- Controllers ---------------- */
 
 export const createPost = async (req, res) => {
   try {
@@ -76,20 +75,18 @@ export const createPost = async (req, res) => {
     const mediaFile = req.file;
 
     if (!content && !mediaFile) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Post content or media is required' 
+        message: 'Post content or media is required',
       });
     }
 
     const author = await User.findById(req.userId);
     if (!author) {
-      if (mediaFile) {
-        fs.unlinkSync(mediaFile.path);
-      }
-      return res.status(404).json({ 
+      if (mediaFile) fs.unlinkSync(mediaFile.path);
+      return res.status(404).json({
         success: false,
-        message: 'User not found' 
+        message: 'User not found',
       });
     }
 
@@ -99,11 +96,11 @@ export const createPost = async (req, res) => {
         id: author._id,
         name: author.name,
         username: author.username,
-        email: author.email
+        email: author.email,
       },
       likes: [],
       comments: [],
-      shares: []
+      shares: [],
     };
 
     if (mediaFile) {
@@ -112,21 +109,18 @@ export const createPost = async (req, res) => {
 
     const post = new Post(postData);
     await post.save();
-    
+
     return res.status(201).json({
       success: true,
-      post: formatPostResponse(post, req)
+      post: formatPostResponse(post, req),
     });
-
   } catch (error) {
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (req.file) fs.unlinkSync(req.file.path);
     console.error('Create post error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to create post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -134,22 +128,18 @@ export const createPost = async (req, res) => {
 export const getUserPosts = async (req, res) => {
   try {
     const posts = await Post.find({ 'author.id': req.userId })
-      .sort({ createdAt: -1 })
-      .populate('likes', 'name username')
-      .populate('shares', 'name username')
-      .populate('comments.author.id', 'name username');
+      .sort({ createdAt: -1 });
 
     return res.json({
       success: true,
-      posts: posts.map(post => formatPostResponse(post, req))
+      posts: posts.map((post) => formatPostResponse(post, req)),
     });
-
   } catch (error) {
     console.error('Get posts error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to get posts',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -157,49 +147,46 @@ export const getUserPosts = async (req, res) => {
 export const likePost = async (req, res) => {
   try {
     const { postId } = req.params;
-    
-    if (!postId || postId === 'undefined' || !mongoose.Types.ObjectId.isValid(postId)) {
-      return res.status(400).json({ 
+
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({
         success: false,
-        message: 'Invalid post ID' 
+        message: 'Invalid post ID',
       });
     }
 
     const userId = req.userId;
     const post = await Post.findById(postId);
-    
+
     if (!post) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Post not found' 
+        message: 'Post not found',
       });
     }
 
-    const likeIndex = post.likes.findIndex(id => id.toString() === userId.toString());
-    
+    const likeIndex = post.likes.findIndex(
+      (id) => id.toString() === userId.toString()
+    );
+
     if (likeIndex >= 0) {
-      post.likes.splice(likeIndex, 1);
+      post.likes.splice(likeIndex, 1); // unlike
     } else {
-      post.likes.push(userId);
+      post.likes.push(userId); // like
     }
 
     await post.save();
-    
-    const updatedPost = await Post.findById(postId)
-      .populate('likes', 'name username')
-      .populate('shares', 'name username')
-      .populate('comments.author.id', 'name username');
 
     res.json({
       success: true,
-      post: formatPostResponse(updatedPost, req)
+      post: formatPostResponse(post, req),
     });
   } catch (error) {
     console.error('Like post error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to like post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: error.message,
     });
   }
 };
@@ -208,21 +195,21 @@ export const addComment = async (req, res) => {
   try {
     const { postId } = req.params;
     const { content } = req.body;
-    
+
     if (!content) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Comment content is required' 
+        message: 'Comment content is required',
       });
     }
 
     const user = await User.findById(req.userId);
     const post = await Post.findById(postId);
-    
+
     if (!post) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Post not found' 
+        message: 'Post not found',
       });
     }
 
@@ -231,29 +218,24 @@ export const addComment = async (req, res) => {
       author: {
         id: user._id,
         name: user.name,
-        username: user.username
+        username: user.username,
       },
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     post.comments.push(newComment);
     await post.save();
-    
-    const updatedPost = await Post.findById(postId)
-      .populate('likes', 'name username')
-      .populate('shares', 'name username')
-      .populate('comments.author.id', 'name username');
 
     res.json({
       success: true,
-      post: formatPostResponse(updatedPost, req)
+      post: formatPostResponse(post, req),
     });
   } catch (error) {
     console.error('Add comment error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to add comment',
-      error: error.message 
+      error: error.message,
     });
   }
 };
@@ -264,41 +246,33 @@ export const sharePost = async (req, res) => {
     const userId = req.userId;
 
     const post = await Post.findById(postId);
-    const user = await User.findById(userId);
-    
     if (!post) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Post not found' 
+        message: 'Post not found',
       });
     }
 
-    const alreadyShared = post.shares.includes(userId);
-    if (alreadyShared) {
-      return res.status(400).json({ 
+    if (post.shares.includes(userId)) {
+      return res.status(400).json({
         success: false,
-        message: 'Post already shared by this user' 
+        message: 'Post already shared by this user',
       });
     }
 
     post.shares.push(userId);
     await post.save();
-    
-    const updatedPost = await Post.findById(postId)
-      .populate('likes', 'name username')
-      .populate('shares', 'name username')
-      .populate('comments.author.id', 'name username');
 
     res.json({
       success: true,
-      post: formatPostResponse(updatedPost, req)
+      post: formatPostResponse(post, req),
     });
   } catch (error) {
     console.error('Share post error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to share post',
-      error: error.message 
+      error: error.message,
     });
   }
 };
@@ -308,15 +282,15 @@ export const deletePost = async (req, res) => {
     const { postId } = req.params;
     const userId = req.userId;
 
-    const post = await Post.findOne({ 
-      _id: postId, 
-      'author.id': userId 
+    const post = await Post.findOne({
+      _id: postId,
+      'author.id': userId,
     });
-    
+
     if (!post) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Post not found or you are not the author' 
+        message: 'Post not found or you are not the author',
       });
     }
 
@@ -329,16 +303,17 @@ export const deletePost = async (req, res) => {
     }
 
     await Post.deleteOne({ _id: postId });
-    res.json({ 
+
+    res.json({
       success: true,
-      message: 'Post deleted successfully' 
+      message: 'Post deleted successfully',
     });
   } catch (error) {
     console.error('Delete post error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to delete post',
-      error: error.message 
+      error: error.message,
     });
   }
 };

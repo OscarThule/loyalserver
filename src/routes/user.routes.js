@@ -11,9 +11,9 @@ import {
 import upload from '../middleware/multer.js';
 
 const router = express.Router();
-// Create a new post (with file upload support)
-router.post('/', auth, upload.single('media'), createPost);
 
+// Create a new post (with Cloudinary file upload support)
+router.post('/', auth, upload.single('media'), createPost);
 
 // Get current user's posts
 router.get('/my-posts', auth, getUserPosts);
